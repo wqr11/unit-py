@@ -212,7 +212,25 @@ class UnitTester:
 
 
 def example():
-    code = """
-print("1", 1)
-    """
-    const test = UnitTester()
+    student_code = """
+a = int(input())
+b = int(input())
+print(a + b)"""
+    tester = UnitTester()
+
+    inputs = [
+        "2\n3\n",
+        "10\n-5\n",
+    ]
+
+    expected_outputs = [
+        "5\n",
+        "5\n",
+    ]
+
+    result = tester.run_tests(student_code, inputs, expected_outputs)
+    return result
+
+
+
+
