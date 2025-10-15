@@ -1,3 +1,4 @@
+from uuid import uuid4
 from fastapi import *
 from models.db_session import global_init
 from unit import *
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 import sqlalchemy
 
 app = FastAPI()
-global_init("static/db/db.sqlite")
+global_init()
 
 
 def get_db():
@@ -32,7 +33,7 @@ def load_data(data: LabsBase, db_sess: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Id already registered")
     try:
         new_labs = Labs(
-            id=data.id,
+            id=str(uuid4()),
             data_input=data.data_input,
             data_output=data.data_output
         )
