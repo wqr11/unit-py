@@ -1,4 +1,6 @@
 from fastapi import *
+
+from models.db_session import global_init
 from unit import example
 from models import db_session
 import uvicorn
@@ -7,7 +9,7 @@ from sqlalchemy.orm import Session
 import sqlalchemy
 
 app = FastAPI()
-
+global_init("static/db/db.sqlite")
 
 def get_db():
     db = db_session.create_session()
