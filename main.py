@@ -24,7 +24,7 @@ def test():
     return example()
 
 
-@app.post("api/loading")
+@app.post("/api/loading")
 def load_data(data: LabsBase , db_sess: Session = Depends(get_db)):
     if db_sess.query(Labs).filter(Labs.id == data.id).first():
         raise HTTPException(status_code=400, detail="Id already registered")
