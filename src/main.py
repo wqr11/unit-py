@@ -60,7 +60,7 @@ def handle_lab_test(student_code: LabTestBase, id: str, db_sess: Session = Depen
         return result
 
 
-@app.post("/update/{id}")
+@app.patch("/labs/{id}")
 def update_labs(update_labs: UpdateBase, id: str, db_sess: Session = Depends(get_db)):
     try:
         labs = db_sess.query(Labs).get(id)
@@ -78,12 +78,12 @@ def update_labs(update_labs: UpdateBase, id: str, db_sess: Session = Depends(get
         return labs
 
 
-@app.get("/read")
+@app.get("/labs")
 def get_all_labs(db_sess: Session = Depends(get_db)):
     return db_sess.query(Labs).all()
 
 
-@app.get("/read/{id}")
+@app.get("/labs/{id}")
 def read_db(id: str, db_sess: Session = Depends(get_db)):
     lab = db_sess.query(Labs).get(id)
     if lab is None:
@@ -92,7 +92,7 @@ def read_db(id: str, db_sess: Session = Depends(get_db)):
         return lab
 
 
-@app.post("/delete/{id}")
+@app.post("/labs/{id}")
 def delete_post(id: str, db_sess: Session = Depends(get_db)):
     try:
         del_labs = db_sess.query(Labs).get(id)
