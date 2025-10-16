@@ -84,12 +84,27 @@ def get_all_labs(db_sess: Session = Depends(get_db)):
 
 
 @app.get("/read/{id}")
-def read_db(id: str | None = None, db_sess: Session = Depends(get_db)):
+def read_db(id: str, db_sess: Session = Depends(get_db)):
     lab = db_sess.query(Labs).get(id)
     if lab is None:
         raise HTTPException(status_code=404, detail="Lab not found")
     else:
         return lab
+
+
+@app.post("/delete/{id}")
+def delete_post(id: str, db_sess: Session = Depends(get_db)):
+    try:
+        del_labs = db_sess.query(Labs).get(id)
+        if del_labs:
+            db_sess.delete(del_labs)
+            db_sess.commit()
+        else:
+            raise HTTPException(status_code=400, detail='Not found')
+    except sqlalchemy.exc.StatementError:
+        raise HTTPException(status_code=400, detail='Bad request')
+    else:
+        return {"detail": "deleted successfully"}
 
 
 if __name__ == "__main__":
