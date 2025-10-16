@@ -92,7 +92,7 @@ def read_db(id: str, db_sess: Session = Depends(get_db)):
         return lab
 
 
-@app.post("/labs/{id}")
+@app.delete("/labs/{id}")
 def delete_post(id: str, db_sess: Session = Depends(get_db)):
     try:
         del_labs = db_sess.query(Labs).get(id)
