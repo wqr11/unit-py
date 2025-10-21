@@ -21,5 +21,23 @@ services:
     networks:
       - unit_py_net
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    ports:
+      - 8000:8000
+    env_file: ".env"
+    networks:
+      - unit_py_net
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+          ignore:
+            - pg-data/
+            - redis-data/
+
 networks:
   unit_py_net:

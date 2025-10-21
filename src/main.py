@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 import sqlalchemy
 from BaseModel.UpdateBase import UpdateBase
 
+
 app = FastAPI()
 global_init()
 
@@ -35,19 +36,21 @@ def load_data(data: LabsBase, db_sess: Session = Depends(get_db)):
             id=str(uuid4()),
             data_input=data.data_input,
             data_output=data.data_output,
-            comment_for_ai=data.comment_for_ai
+            comment_for_ai=data.comment_for_ai,
         )
         db_sess.add(new_labs)
         db_sess.commit()
         db_sess.refresh(new_labs)
     except sqlalchemy.exc.StatementError:
-        raise HTTPException(status_code=400, detail='Bad request')
+        raise HTTPException(status_code=400, detail="Bad request")
     else:
         return new_labs
 
 
 @app.post("/labs/{id}/test")
-def handle_lab_test(student_code: LabTestBase, id: str, db_sess: Session = Depends(get_db)):
+def handle_lab_test(
+    student_code: LabTestBase, id: str, db_sess: Session = Depends(get_db)
+):
     try:
         labs = db_sess.query(Labs).get(id)
         inputs = [labs.data_input]
@@ -55,7 +58,7 @@ def handle_lab_test(student_code: LabTestBase, id: str, db_sess: Session = Depen
         tester = UnitTester()
         result = tester.run_tests(student_code.student_code, inputs, expected_outputs)
     except Exception:
-        raise HTTPException(status_code=400, detail='Bad request')
+        raise HTTPException(status_code=400, detail="Bad request")
     else:
         return result
 
@@ -71,9 +74,9 @@ def update_labs(update_labs: UpdateBase, id: str, db_sess: Session = Depends(get
             db_sess.commit()
             db_sess.refresh(labs)
         else:
-            raise HTTPException(status_code=400, detail='Not found')
+            raise HTTPException(status_code=400, detail="Not found")
     except sqlalchemy.exc.StatementError:
-        raise HTTPException(status_code=400, detail='Bad request')
+        raise HTTPException(status_code=400, detail="Bad request")
     else:
         return labs
 
@@ -100,12 +103,12 @@ def delete_post(id: str, db_sess: Session = Depends(get_db)):
             db_sess.delete(del_labs)
             db_sess.commit()
         else:
-            raise HTTPException(status_code=400, detail='Not found')
+            raise HTTPException(status_code=400, detail="Not found")
     except sqlalchemy.exc.StatementError:
-        raise HTTPException(status_code=400, detail='Bad request')
+        raise HTTPException(status_code=400, detail="Bad request")
     else:
         return {"detail": "deleted successfully"}
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
