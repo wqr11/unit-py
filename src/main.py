@@ -4,10 +4,10 @@ from uuid import uuid4
 from argon2 import verify_password
 from fastapi import *
 from jose import jwt
-from src.models.db_session import global_init
+from models.db_session import global_init
 from src.models.User import Users
 from unit import *
-from src.models.db_session import global_init
+from models import db_session
 import uvicorn
 from models.labs import Labs
 from BaseModel.LabsBase import LabsBase
