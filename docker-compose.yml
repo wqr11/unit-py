@@ -7,6 +7,19 @@ services:
       - ./pg-data:/var/lib/postgresql/data
     ports:
       - 5432:5432
+    networks:
+      - unit_py_net
+
+  redis:
+    image: redis:8.2-alpine
+    restart: always
+    env_file: ".env"
+    volumes:
+      - ./redis-data:/data
+    ports:
+      - 6379:6379
+    networks:
+      - unit_py_net
 
 networks:
   unit_py_net:
