@@ -1,8 +1,9 @@
 from sqlalchemy import *
 from models.db_session import SqlAlchemyBase
 
+
 class Labs(SqlAlchemyBase):
-    __tablename__ = 'Labs'
+    __tablename__ = "Labs"
 
     id = Column(String, primary_key=True)
     data_input = Column(String, nullable=True)

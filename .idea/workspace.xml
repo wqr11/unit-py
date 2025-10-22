@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="08678353-3f09-491b-8737-3fb97b35c4da" name="Changes" comment="feat: orm users and authentication">
+      <change afterPath="$PROJECT_DIR$/.idea/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/unit-py.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/models/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/static/db/db.sqlite" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="feat/update" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;qussa07&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/wqr11/unit-py&quot;,
+    &quot;accountId&quot;: &quot;f6a18918-bbba-458e-8636-5aba495c8057&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="344DnEGTH0L5FYhKtfILITVftJa" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Python.__all_models.executor": "Run",
+    "Python.main.executor": "Run",
+    "Python.unit.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "C:/Users/wirr/unit-py/src",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\wirr\unit-py\src" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\wirr\unit-py\src" />
+      <recent name="C:\Users\wirr\unit-py\src\models" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-0e3be3396995-c546a90a8094-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-242.23339.19" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="08678353-3f09-491b-8737-3fb97b35c4da" name="Changes" comment="" />
+      <created>1760464115526</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1760464115526</updated>
+    </task>
+    <task id="LOCAL-00001" summary="feat: добавил эндпоит">
+      <option name="closed" value="true" />
+      <created>1760467768222</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1760467768222</updated>
+    </task>
+    <task id="LOCAL-00002" summary="feat: залил файл с эндпоинтом">
+      <option name="closed" value="true" />
+      <created>1760467869278</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1760467869278</updated>
+    </task>
+    <task id="LOCAL-00003" summary="feat: I started making ORM models and added a data loading endpoint.">
+      <option name="closed" value="true" />
+      <created>1760532109409</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1760532109409</updated>
+    </task>
+    <task id="LOCAL-00004" summary="feat: Added global init for DB">
+      <option name="closed" value="true" />
+      <created>1760532334351</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1760532334351</updated>
+    </task>
+    <task id="LOCAL-00005" summary="fix: Fixed the error where there were no files for the database.">
+      <option name="closed" value="true" />
+      <created>1760532931555</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1760532931555</updated>
+    </task>
+    <task id="LOCAL-00006" summary="refactor: renamed post">
+      <option name="closed" value="true" />
+      <created>1760533103067</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1760533103067</updated>
+    </task>
+    <task id="LOCAL-00007" summary="feat: add new endpoint for testing student code">
+      <option name="closed" value="true" />
+      <created>1760555050716</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1760555050716</updated>
+    </task>
+    <task id="LOCAL-00008" summary="feat: implemented create, read, and update data">
+      <option name="closed" value="true" />
+      <created>1760647960838</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1760647960838</updated>
+    </task>
+    <task id="LOCAL-00009" summary="feat: implemented create, read, update and delete data">
+      <option name="closed" value="true" />
+      <created>1760648573765</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1760648573765</updated>
+    </task>
+    <task id="LOCAL-00010" summary="feat: implemented create, read, update and delete data">
+      <option name="closed" value="true" />
+      <created>1760649536864</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1760649536864</updated>
+    </task>
+    <task id="LOCAL-00011" summary="fix: endpoint delete">
+      <option name="closed" value="true" />
+      <created>1760649875201</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1760649875201</updated>
+    </task>
+    <task id="LOCAL-00012" summary="feat: orm users and authentication">
+      <option name="closed" value="true" />
+      <created>1761058326073</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1761058326073</updated>
+    </task>
+    <task id="LOCAL-00013" summary="feat: orm users and authentication">
+      <option name="closed" value="true" />
+      <created>1761058625165</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1761058625165</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="feat: добавил эндпоит" />
+    <MESSAGE value="feat: залил файл с эндпоинтом" />
+    <MESSAGE value="feat: I started making ORM models and added a data loading endpoint." />
+    <MESSAGE value="feat: Added global init for DB" />
+    <MESSAGE value="fix: Fixed the error where there were no files for the database." />
+    <MESSAGE value="refactor: renamed post" />
+    <MESSAGE value="feat: add new endpoint for testing student code" />
+    <MESSAGE value="feat: implemented create, read, and update data" />
+    <MESSAGE value="feat: implemented create, read, update and delete data" />
+    <MESSAGE value="fix: endpoint delete" />
+    <MESSAGE value="feat: orm users and authentication" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: orm users and authentication" />
+  </component>
+</project>
