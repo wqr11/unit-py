@@ -5,7 +5,7 @@ from argon2 import verify_password
 from fastapi import *
 from jose import jwt
 from models.db_session import global_init
-from src.models.User import Users
+from models.User import Users
 from unit import *
 from models import db_session
 import uvicorn

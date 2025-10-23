@@ -33,11 +33,10 @@ services:
     develop:
       watch:
         - action: sync
-          path: ./src
-          target: /app/src
+          path: ./app
+          target: ./src
           ignore:
-            - pg-data/
-            - redis-data/
+            - __pycache__/
 
 networks:
   unit_py_net:

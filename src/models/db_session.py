@@ -26,8 +26,6 @@ def global_init():
     engine = sa.create_engine(POSTGRES_URL, echo=False)
     __factory = orm.sessionmaker(bind=engine)
 
-    from . import __all_models
-
     SqlAlchemyBase.metadata.create_all(engine)
 
 
