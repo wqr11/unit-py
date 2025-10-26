@@ -26,7 +26,12 @@ def global_init():
     engine = sa.create_engine(POSTGRES_URL, echo=False)
     __factory = orm.sessionmaker(bind=engine)
 
+    import models.__all_models
+
+    log("info", f"Registered tables before create: {SqlAlchemyBase.metadata.tables.keys()}")
     SqlAlchemyBase.metadata.create_all(engine)
+    log("info", f"Registered tables after create: {SqlAlchemyBase.metadata.tables.keys()}")
+
 
 
 def create_session() -> Session:
