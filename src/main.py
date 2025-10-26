@@ -1,28 +1,32 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
-from argon2 import verify_password
-from fastapi import *
+import os
+from sqlalchemy import exc
+from fastapi import FastAPI, Depends, HTTPException, status, Response, Request
 from jose import jwt
-from models.db_session import global_init
-from models.User import Users
-from unit import *
-from models import db_session
+from dotenv import load_dotenv
 import uvicorn
+import redis.asyncio as aioredis
+from sqlalchemy.orm import Session
+from models.User import Users
 from models.labs import Labs
+from BaseModel.UserRegBase import UserRegBase
 from BaseModel.LabsBase import LabsBase
 from BaseModel.Lab_test import LabTestBase
-from sqlalchemy.orm import Session
-import sqlalchemy
 from BaseModel.UpdateBase import UpdateBase
-from dotenv import load_dotenv
-from datetime import datetime
-import os
-from BaseModel.UserRegBase import UserRegBase
-import redis.asyncio as aioredis
+from BaseModel.UserLoginBase import UserLoginBase
+from unit import *
+from models.db_session import global_init, create_session
+from passlib.context import CryptContext
+from fastapi.security import OAuth2PasswordBearer
+from argon2 import PasswordHasher
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Загружаем переменные из .env
 load_dotenv()
+
 
 # Получаем значения
 postgres_user = os.getenv("POSTGRES_USER")
@@ -39,13 +43,24 @@ redis_host = os.getenv("REDIS_HOST")
 redis_port = int(os.getenv("REDIS_PORT", 6379))
 
 
-app = FastAPI()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+
 global_init()
+app = FastAPI()
 redis_client = aioredis.Redis(host="localhost", port=6379, decode_responses=True)
 
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 def get_db():
-    db = db_session.create_session()
+    db = create_session()
     try:
         yield db
     finally:
@@ -60,7 +75,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-def create_refresh_token(data: dict, db_sess: Session, expires_delta: Optional[timedelta] = None):
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     token_id = str(uuid4())
     expire = datetime.utcnow() + (expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
@@ -92,6 +107,15 @@ async def save_in_redis(user_id: str, token: str):
         f"refresh:{user_id}", REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600, token
     )
 
+
+def hashed_password(password):
+    ph = PasswordHasher()
+    return ph.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
 @app.get("/")
 def test():
     return example()
@@ -101,35 +125,52 @@ def test():
 def register(user: UserRegBase, db_sess: Session = Depends(get_db)):
     try:
         if db_sess.query(Users).filter(Users.email == user.email).first():
-            raise HTTPException(status_code=400, detail="Email already register")
+            raise HTTPException(status_code=401, detail="Email already register")
         new_user = Users(
             id=str(uuid4()),
             email=user.email,
-            password=user.password,
+            password=hashed_password(user.password),
             is_student=user.is_student
         )
         db_sess.add(new_user)
         db_sess.commit()
-        db_sess.refresh()
-    except sqlalchemy.exc.StatementError:
+        db_sess.refresh(new_user)
+    except exc.StatementError as f:
+        print(f)
         raise HTTPException(status_code=400, detail='Bad request')
     else:
         return {"id": new_user.id}
 
 
+@app.post("/refresh")
+def refresh_token(response: Response, request: Request, db_sess: Session = Depends(get_db)):
+        refresh_token = request.cookies.get("refresh_token")
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        stored_token = redis_client.get(f"refresh:{user_id}")
+        if not stored_token:
+            raise HTTPException(status_code=401, detail="Refresh token revoked or expired")
+        new_redresh_token = create_refresh_token({"sub": user_id})
+        new_access_token = create_access_token({"sub": user_id})
+        save_in_redis(user_id, new_redresh_token)
+        save_cookies(response, new_access_token, new_redresh_token)
+        return {"messege": "ok"}
+
+
+
 @app.post("/login")
-def login(response: Response, email: str, password: str, db_sess: Session = Depends(get_db)):
+def login(response: Response, user: UserLoginBase, db_sess: Session = Depends(get_db)):
     try:
-        db_user = db_sess.query(Users).filter(Users.email == email).first()
+        db_user = db_sess.query(Users).filter(Users.email == user.email).first()
         if not db_user:
             raise HTTPException(status_code=401, detail="Invalid email or password")
-        if not verify_password(password, db_user.password):
+        if not verify_password(user.password, db_user.password):
             raise HTTPException(status_code=401, detail="Invalid email or password")
         access_token = create_access_token(data={"sub": str(db_user.id)})
         refresh_token = create_refresh_token(data={"sub": str(db_user.id)}, db_sess=db_sess)
         save_cookies(response, access_token, refresh_token)
         save_in_redis(db_user.id, refresh_token)
-    except sqlalchemy.exc.StatementError:
+    except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad requests")
     else:
         return {"message": "Logged in successfully"}
@@ -146,7 +187,7 @@ def load_data(data: LabsBase, db_sess: Session = Depends(get_db)):
         db_sess.add(new_labs)
         db_sess.commit()
         db_sess.refresh(new_labs)
-    except sqlalchemy.exc.StatementError:
+    except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad request")
     else:
         return new_labs
@@ -180,7 +221,7 @@ def update_labs(update_labs: UpdateBase, id: str, db_sess: Session = Depends(get
             db_sess.refresh(labs)
         else:
             raise HTTPException(status_code=400, detail="Not found")
-    except sqlalchemy.exc.StatementError:
+    except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad request")
     else:
         return labs
@@ -209,7 +250,7 @@ def delete_post(id: str, db_sess: Session = Depends(get_db)):
             db_sess.commit()
         else:
             raise HTTPException(status_code=400, detail="Not found")
-    except sqlalchemy.exc.StatementError:
+    except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad request")
     else:
         return {"detail": "deleted successfully"}
