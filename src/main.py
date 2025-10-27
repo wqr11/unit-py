@@ -167,13 +167,15 @@ def login(response: Response, user: UserLoginBase, db_sess: Session = Depends(ge
         if not verify_password(user.password, db_user.password):
             raise HTTPException(status_code=401, detail="Invalid email or password")
         access_token = create_access_token(data={"sub": str(db_user.id)})
-        refresh_token = create_refresh_token(data={"sub": str(db_user.id)}, db_sess=db_sess)
+        refresh_token = create_refresh_token(data={"sub": str(db_user.id)})
         save_cookies(response, access_token, refresh_token)
         save_in_redis(db_user.id, refresh_token)
+
+        return {"access_token": access_token, "refresh_token": refresh_token}
     except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad requests")
-    else:
-        return {"message": "Logged in successfully"}
+    except:
+        HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.post("/labs")
 def load_data(data: LabsBase, db_sess: Session = Depends(get_db)):
