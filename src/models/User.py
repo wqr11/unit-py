@@ -1,4 +1,6 @@
-from sqlalchemy import String, Column, Boolean
+# models/users.py
+from sqlalchemy import String, Column
+from sqlalchemy.orm import relationship
 from models.db_session import SqlAlchemyBase
 
 class Users(SqlAlchemyBase):
@@ -7,4 +9,6 @@ class Users(SqlAlchemyBase):
     id = Column(String, primary_key=True)
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
-    is_student = Column(Boolean, nullable=False)
+
+    # связь с Labs (один ко многим)
+    labs = relationship("Labs", back_populates="user", cascade="all, delete-orphan")

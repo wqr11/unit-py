@@ -4,7 +4,7 @@ from uuid import uuid4
 import os
 from sqlalchemy import exc
 from fastapi import FastAPI, Depends, HTTPException, status, Response, Request
-from jose import jwt
+from jose import jwt, JWTError, ExpiredSignatureError
 from dotenv import load_dotenv
 import uvicorn
 import redis.asyncio as aioredis
@@ -22,6 +22,8 @@ from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
 from argon2 import PasswordHasher
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, BackgroundTasks
+from email_utils import send_report_email
 
 
 # Загружаем переменные из .env
@@ -66,6 +68,33 @@ def get_db():
     finally:
         db.close()
 
+def get_user_id_from_cookie(request: Request) -> str:
+    """
+    Извлекает user_id (str) из JWT токена, хранящегося в cookies.
+    Подходит для UUID в строковом формате (например, uuid64).
+    """
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing token in cookies",
+        )
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload: user_id missing",
+            )
+        return str(user_id)
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -95,7 +124,7 @@ def save_cookies(response, access, refresh):
     )
     response.set_cookie(
         key="refresh_token",
-        value=access,
+        value=refresh,
         httponly=True,  # защищает от JS-доступа
         secure=False,  # True в проде (HTTPS)
         samesite="lax",  # можно strict/lax/none
@@ -129,8 +158,7 @@ def register(user: UserRegBase, db_sess: Session = Depends(get_db)):
         new_user = Users(
             id=str(uuid4()),
             email=user.email,
-            password=hashed_password(user.password),
-            is_student=user.is_student
+            password=hashed_password(user.password)
         )
         db_sess.add(new_user)
         db_sess.commit()
@@ -143,23 +171,29 @@ def register(user: UserRegBase, db_sess: Session = Depends(get_db)):
 
 
 @app.post("/refresh")
-def refresh_token(response: Response, request: Request, db_sess: Session = Depends(get_db)):
-        refresh_token = request.cookies.get("refresh_token")
-        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        stored_token = redis_client.get(f"refresh:{user_id}")
-        if not stored_token:
-            raise HTTPException(status_code=401, detail="Refresh token revoked or expired")
-        new_redresh_token = create_refresh_token({"sub": user_id})
-        new_access_token = create_access_token({"sub": user_id})
-        save_in_redis(user_id, new_redresh_token)
-        save_cookies(response, new_access_token, new_redresh_token)
-        return {"messege": "ok"}
+async def refresh_token(response: Response, request: Request, db_sess: Session = Depends(get_db)):
+        try:
+            refresh_token = request.cookies.get("refresh_token")
+            payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = payload.get("sub")
+            stored_token = await redis_client.get(f"refresh:{user_id}")
+            if not stored_token:
+                raise HTTPException(status_code=401, detail="Refresh token revoked or expired")
+            new_redresh_token = create_refresh_token({"sub": user_id})
+            new_access_token = create_access_token({"sub": user_id})
+            save_in_redis(user_id, new_redresh_token)
+            save_cookies(response, new_access_token, new_redresh_token)
+            return {"messege": "ok"}
+        except ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Refresh token expired")
+        except JWTError:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+        
 
 
 
 @app.post("/login")
-def login(response: Response, user: UserLoginBase, db_sess: Session = Depends(get_db)):
+async def login(response: Response, user: UserLoginBase, db_sess: Session = Depends(get_db)):
     try:
         db_user = db_sess.query(Users).filter(Users.email == user.email).first()
         if not db_user:
@@ -167,9 +201,9 @@ def login(response: Response, user: UserLoginBase, db_sess: Session = Depends(ge
         if not verify_password(user.password, db_user.password):
             raise HTTPException(status_code=401, detail="Invalid email or password")
         access_token = create_access_token(data={"sub": str(db_user.id)})
-        refresh_token = create_refresh_token(data={"sub": str(db_user.id)}, db_sess=db_sess)
+        refresh_token = create_refresh_token(data={"sub": str(db_user.id)})
         save_cookies(response, access_token, refresh_token)
-        save_in_redis(db_user.id, refresh_token)
+        await save_in_redis(db_user.id, refresh_token)
     except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad requests")
     else:
@@ -194,19 +228,49 @@ def load_data(data: LabsBase, db_sess: Session = Depends(get_db)):
 
 
 @app.post("/labs/{id}/test")
-def handle_lab_test(
-    student_code: LabTestBase, id: str, db_sess: Session = Depends(get_db)
+async def handle_lab_test(
+    response: Response,
+    student_code: LabTestBase,
+    background_tasks: BackgroundTasks,
+    id: str,
+    db_sess: Session = Depends(get_db)
 ):
     try:
-        labs = db_sess.query(Labs).get(id)
-        inputs = [labs.data_input]
-        expected_outputs = [labs.data_output]
+        # получаем лабораторную
+        lab = db_sess.query(Labs).filter(Labs.id == id).first()
+        if not lab:
+            raise HTTPException(status_code=404, detail="Lab not found")
+
+        # извлекаем входные и ожидаемые данные
+        inputs = [lab.data_input]
+        expected_outputs = [lab.data_output]
+
+        # тестируем студенческий код
         tester = UnitTester()
         result = tester.run_tests(student_code.student_code, inputs, expected_outputs)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Bad request")
-    else:
+
+        # получаем email владельца лабораторной
+        user_email = (
+            db_sess.query(Users.email)
+            .join(Labs)
+            .filter(Labs.id == id)
+            .scalar()
+        )
+        if not user_email:
+            raise HTTPException(status_code=404, detail="User email not found")
+
+        # добавляем задачу на отправку письма
+        subject = "Отчёт о выполнении задания"
+        body = "Здравствуйте! Ваш отчёт успешно обработан ✅."
+        background_tasks.add_task(send_report_email, user_email, subject, body)
+
         return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Ошибка при обработке лабораторной: {e}")
+        raise HTTPException(status_code=400, detail="Bad request")
 
 
 @app.patch("/labs/{id}")
