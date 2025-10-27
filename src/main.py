@@ -50,7 +50,7 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 global_init()
 app = FastAPI()
-redis_client = aioredis.Redis(host="localhost", port=6379, decode_responses=True)
+redis_client = aioredis.Redis(host=redis_host, port=redis_port, decode_responses=True)
 
 
 app.add_middleware(
@@ -82,7 +82,7 @@ def get_user_id_from_cookie(request: Request) -> str:
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("user_id")
+        user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -210,13 +210,15 @@ async def login(response: Response, user: UserLoginBase, db_sess: Session = Depe
         return {"message": "Logged in successfully"}
 
 @app.post("/labs")
-def load_data(data: LabsBase, db_sess: Session = Depends(get_db)):
+def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_db)):
     try:
+        user_id=get_user_id_from_cookie(requests)
         new_labs = Labs(
             id=str(uuid4()),
             data_input=data.data_input,
             data_output=data.data_output,
             comment_for_ai=data.comment_for_ai,
+            user_id=user_id
         )
         db_sess.add(new_labs)
         db_sess.commit()
@@ -258,11 +260,8 @@ async def handle_lab_test(
         )
         if not user_email:
             raise HTTPException(status_code=404, detail="User email not found")
-
-        # добавляем задачу на отправку письма
-        subject = "Отчёт о выполнении задания"
-        body = "Здравствуйте! Ваш отчёт успешно обработан ✅."
-        background_tasks.add_task(send_report_email, user_email, subject, body)
+        text = [result["correct"], student_code.name, student_code.surname, student_code.group ]
+        background_tasks.add_task(send_report_email, user_email, text)
 
         return result
 
