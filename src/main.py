@@ -59,6 +59,51 @@ def get_db():
     finally:
         db.close()
 
+def json_to_email_text(result_json, first_name="", last_name=""):
+    lines = []
+
+    # Информация об авторе
+    if first_name or last_name:
+        lines.append(f"Тест прошёл: {first_name} {last_name}".strip())
+        lines.append("")
+
+    # Основная информация
+    lines.append(f"✅ Correct: {result_json['correct']}")
+    lines.append(f"Пройдено тестов: {result_json['passed_tests']} из {result_json['total_tests']}")
+    lines.append(f"Процент успешных тестов: {result_json['success_rate']*100:.1f}%\n")
+
+    # Ошибки общего уровня
+    if result_json['errors']:
+        lines.append("Ошибки:")
+        for err in result_json['errors']:
+            lines.append(f"  - {err}")
+        lines.append("")
+
+    # Логи
+    if result_json['logs']:
+        lines.append("Логи:")
+        for log in result_json['logs']:
+            lines.append(f"  {log}")
+        lines.append("")
+
+    # Подробные результаты
+    if result_json.get('detailed_results'):
+        lines.append("Подробные результаты тестов:")
+        for dr in result_json['detailed_results']:
+            lines.append(f"Тест #{dr['test_number']}: {'✅' if dr['correct'] else '❌'}")
+            lines.append(f"  Входные данные: {dr['input']}")
+            lines.append(f"  Ожидаемый вывод: {dr['expected_output']}")
+            lines.append(f"  Фактический вывод: {dr['actual_output']}")
+            if dr.get('error'):
+                lines.append(f"  Ошибка: {dr['error']}")
+            if dr.get('diff'):
+                lines.append(f"  Diff:\n{dr['diff']}")
+            if dr.get('log'):
+                lines.append(f"  Лог:\n{dr['log']}")
+            lines.append("")
+
+    return "\n".join(lines)
+
 def verify_token(request: Request):
     token = request.cookies.get("access_token")
     if not token:
@@ -204,11 +249,16 @@ async def login(response: Response, user: UserLoginBase, db_sess: Session = Depe
         access_token = create_access_token(data={"sub": str(db_user.id)})
         refresh_token = create_refresh_token(data={"sub": str(db_user.id)})
         save_cookies(response, access_token, refresh_token)
-        await save_in_redis(db_user.id, refresh_token)
+        save_in_redis(db_user.id, refresh_token)
+
+        if not (access_token and refresh_token):
+            raise HTTPException(status_code=500, detail="No access or refresh tokens were acquired")
+
+        return {"access_token": access_token, "refresh_token": refresh_token}
     except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad requests")
-    else:
-        return {"message": "Logged in successfully"}
+    except:
+        HTTPException(status_code=500, detail="Internal Server Error")
 
 
 
@@ -245,6 +295,29 @@ def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_
 
 @app.post("/labs/{id}/test")
 async def handle_lab_test(
+    student_code: LabTestBase,
+    id: str,
+    db_sess: Session = Depends(get_db)
+):
+    # получаем лабораторную
+    lab = db_sess.query(Labs).filter(Labs.id == id).first()
+    if not lab:
+        raise HTTPException(status_code=404, detail="Lab not found")
+
+    # извлекаем входные и ожидаемые данные
+    inputs = [lab.data_input]
+    expected_outputs = [lab.data_output]
+
+    # тестируем студенческий код
+    tester = UnitTester()
+    result = tester.run_tests(student_code.student_code, inputs, expected_outputs)
+
+    # возвращаем результат тестирования
+    return result
+
+
+@app.post("/labs/{id}/test-send")
+async def handle_lab_test(
     response: Response,
     student_code: LabTestBase,
     background_tasks: BackgroundTasks,
@@ -274,7 +347,7 @@ async def handle_lab_test(
         )
         if not user_email:
             raise HTTPException(status_code=404, detail="User email not found")
-        text = [result["correct"], student_code.name, student_code.surname, student_code.group ]
+        text = json_to_email_text(result, student_code.name, student_code.surname)
         background_tasks.add_task(send_report_email, user_email, text)
 
         return result
