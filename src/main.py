@@ -171,6 +171,9 @@ def login(response: Response, user: UserLoginBase, db_sess: Session = Depends(ge
         save_cookies(response, access_token, refresh_token)
         save_in_redis(db_user.id, refresh_token)
 
+        if not (access_token and refresh_token):
+            raise HTTPException(status_code=500, detail="No access or refresh tokens were acquired")
+
         return {"access_token": access_token, "refresh_token": refresh_token}
     except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad requests")
