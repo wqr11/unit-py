@@ -287,10 +287,13 @@ async def handle_lab_test(
 
 
 @app.patch("/labs/{id}", dependencies=[Depends(verify_token)])
-def update_labs(update_labs: UpdateBase, id: str, db_sess: Session = Depends(get_db)):
+def update_labs(request: Request, update_labs: UpdateBase, id: str, db_sess: Session = Depends(get_db)):
     try:
         labs = db_sess.query(Labs).get(id)
+        user_id = get_user_id_from_cookie(request)
         if labs:
+            if labs.user_id != user_id:
+                raise HTTPException(status_code=400, detail="Not found")
             labs.name = update_labs.name
             labs.data_input = update_labs.data_input
             labs.data_output = update_labs.data_output
@@ -320,9 +323,13 @@ def read_db(id: str, db_sess: Session = Depends(get_db)):
 
 
 @app.delete("/labs/{id}", dependencies=[Depends(verify_token)])
-def delete_post(id: str, db_sess: Session = Depends(get_db)):
+def delete_post(request: Request, id: str, db_sess: Session = Depends(get_db)):
     try:
         del_labs = db_sess.query(Labs).get(id)
+        user_id = get_user_id_from_cookie(request)
+        if del_labs:
+            if del_labs.user_id != user_id:
+                raise HTTPException(status_code=400, detail="Not found")
         if del_labs:
             db_sess.delete(del_labs)
             db_sess.commit()
