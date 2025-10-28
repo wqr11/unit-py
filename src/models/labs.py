@@ -7,6 +7,7 @@ class Labs(SqlAlchemyBase):
     __tablename__ = "labs"
 
     id = Column(String, primary_key=True)
+    name= Column(String, nullable=False)
     data_input = Column(String, nullable=True)
     data_output = Column(String, nullable=True)
     comment_for_ai = Column(String, nullable=True)

@@ -52,21 +52,22 @@ global_init()
 app = FastAPI()
 redis_client = aioredis.Redis(host=redis_host, port=redis_port, decode_responses=True)
 
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 def get_db():
     db = create_session()
     try:
         yield db
     finally:
         db.close()
+
+def verify_token(request: Request):
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Access token missing")
+
+    try:
+        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 def get_user_id_from_cookie(request: Request) -> str:
     """
@@ -209,7 +210,19 @@ async def login(response: Response, user: UserLoginBase, db_sess: Session = Depe
     else:
         return {"message": "Logged in successfully"}
 
-@app.post("/labs")
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+
+@app.post("/labs", dependencies=[Depends(verify_token)])
 def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_db)):
     try:
         user_id=get_user_id_from_cookie(requests)
@@ -218,7 +231,8 @@ def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_
             data_input=data.data_input,
             data_output=data.data_output,
             comment_for_ai=data.comment_for_ai,
-            user_id=user_id
+            user_id=user_id,
+            name=data.name
         )
         db_sess.add(new_labs)
         db_sess.commit()
@@ -272,11 +286,12 @@ async def handle_lab_test(
         raise HTTPException(status_code=400, detail="Bad request")
 
 
-@app.patch("/labs/{id}")
+@app.patch("/labs/{id}", dependencies=[Depends(verify_token)])
 def update_labs(update_labs: UpdateBase, id: str, db_sess: Session = Depends(get_db)):
     try:
         labs = db_sess.query(Labs).get(id)
         if labs:
+            labs.name = update_labs.name
             labs.data_input = update_labs.data_input
             labs.data_output = update_labs.data_output
             labs.comment_for_ai = update_labs.comment_for_ai
@@ -304,7 +319,7 @@ def read_db(id: str, db_sess: Session = Depends(get_db)):
         return lab
 
 
-@app.delete("/labs/{id}")
+@app.delete("/labs/{id}", dependencies=[Depends(verify_token)])
 def delete_post(id: str, db_sess: Session = Depends(get_db)):
     try:
         del_labs = db_sess.query(Labs).get(id)
