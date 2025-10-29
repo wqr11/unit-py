@@ -24,6 +24,9 @@ from argon2 import PasswordHasher
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, BackgroundTasks
 from email_utils import send_report_email
+from chat.openai import client
+import json
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 # Загружаем переменные из .env
@@ -58,6 +61,76 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def json_to_email_text(result_json, first_name="", last_name="", student_code="", ai_feedback=None):
+    lines = []
+
+    # Информация об авторе
+    if first_name or last_name:
+        lines.append(f"Тест прошёл: {first_name} {last_name}".strip())
+        lines.append("")
+
+    # Код студента
+    if student_code:
+        lines.append("Код студента:")
+        lines.append(student_code)
+        lines.append("")
+
+    # Основная информация
+    lines.append(f"✅ Correct: {result_json['correct']}")
+    lines.append(f"Пройдено тестов: {result_json['passed_tests']} из {result_json['total_tests']}")
+    lines.append(f"Процент успешных тестов: {result_json['success_rate']*100:.1f}%\n")
+
+    # Ошибки общего уровня
+    if result_json.get('errors'):
+        lines.append("Ошибки:")
+        for err in result_json['errors']:
+            lines.append(f"  - {err}")
+        lines.append("")
+
+    # Логи
+    if result_json.get('logs'):
+        lines.append("Логи:")
+        for log in result_json['logs']:
+            lines.append(f"  {log}")
+        lines.append("")
+
+    # Подробные результаты
+    if result_json.get('detailed_results'):
+        lines.append("Подробные результаты тестов:")
+        for dr in result_json['detailed_results']:
+            lines.append(f"Тест #{dr['test_number']}: {'✅' if dr['correct'] else '❌'}")
+            lines.append(f"  Входные данные: {dr['input']}")
+            lines.append(f"  Ожидаемый вывод: {dr['expected_output']}")
+            lines.append(f"  Фактический вывод: {dr['actual_output']}")
+            if dr.get('error'):
+                lines.append(f"  Ошибка: {dr['error']}")
+            if dr.get('diff'):
+                lines.append(f"  Diff:\n{dr['diff']}")
+            if dr.get('log'):
+                lines.append(f"  Лог:\n{dr['log']}")
+            lines.append("")
+
+    # Комментарии от ИИ с указанием места ошибки
+    if ai_feedback and ai_feedback.get("errors"):
+        lines.append("💡 Комментарии от ИИ:")
+        student_lines = student_code.split("\n")
+        for e in ai_feedback["errors"]:
+            row = e["row"]
+            code_line = student_lines[row - 1] if 0 < row <= len(student_lines) else ""
+            
+            # стрелочки под всю строку (пока нет точного столбца)
+            pointer_line = " " * 0 + "∧" * len(code_line) if code_line else ""
+
+            lines.append(f"{row} | {code_line}")
+            if pointer_line:
+                lines.append(pointer_line)
+            lines.append(f"{e['error_message']}")
+            lines.append("")
+    
+    return "\n".join(lines)
+
+
 
 def verify_token(request: Request):
     token = request.cookies.get("access_token")
@@ -220,11 +293,18 @@ async def login(response: Response, user: UserLoginBase, db_sess: Session = Depe
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def add_cors_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 
 @app.post("/labs", dependencies=[Depends(verify_token)])
@@ -250,7 +330,29 @@ def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_
 
 @app.post("/labs/{id}/test")
 async def handle_lab_test(
-    response: Response,
+    student_code: LabTestBase,
+    id: str,
+    db_sess: Session = Depends(get_db)
+):
+    # получаем лабораторную
+    lab = db_sess.query(Labs).filter(Labs.id == id).first()
+    if not lab:
+        raise HTTPException(status_code=404, detail="Lab not found")
+
+    # извлекаем входные и ожидаемые данные
+    inputs = [lab.data_input]
+    expected_outputs = [lab.data_output]
+
+    # тестируем студенческий код
+    tester = UnitTester()
+    result = tester.run_tests(student_code.student_code, inputs, expected_outputs)
+
+    # возвращаем результат тестирования
+    return result
+
+
+@app.post("/labs/{id}/test-send")
+async def handle_lab_test(
     student_code: LabTestBase,
     background_tasks: BackgroundTasks,
     id: str,
@@ -279,23 +381,26 @@ async def handle_lab_test(
         )
         if not user_email:
             raise HTTPException(status_code=404, detail="User email not found")
-        text = [result["correct"], student_code.name, student_code.surname, student_code.group ]
+        comm_ai = client.validate_task(f'Код студента:\n{student_code.student_code}\n\nКомментарии преподавателя:\n{lab.comment_for_ai}')
+        text = json_to_email_text(result, student_code.name, student_code.surname, student_code.student_code, json.loads(comm_ai["output_text"]))
+        print( json.loads(comm_ai["output_text"]))
         background_tasks.add_task(send_report_email, user_email, text)
 
         return result
 
-    except HTTPException:
-        raise
     except Exception as e:
         print(f"❌ Ошибка при обработке лабораторной: {e}")
         raise HTTPException(status_code=400, detail="Bad request")
 
 
 @app.patch("/labs/{id}", dependencies=[Depends(verify_token)])
-def update_labs(update_labs: UpdateBase, id: str, db_sess: Session = Depends(get_db)):
+def update_labs(request: Request, update_labs: UpdateBase, id: str, db_sess: Session = Depends(get_db)):
     try:
         labs = db_sess.query(Labs).get(id)
+        user_id = get_user_id_from_cookie(request)
         if labs:
+            if labs.user_id != user_id:
+                raise HTTPException(status_code=400, detail="Not found")
             labs.name = update_labs.name
             labs.data_input = update_labs.data_input
             labs.data_output = update_labs.data_output
@@ -325,9 +430,13 @@ def read_db(id: str, db_sess: Session = Depends(get_db)):
 
 
 @app.delete("/labs/{id}", dependencies=[Depends(verify_token)])
-def delete_post(id: str, db_sess: Session = Depends(get_db)):
+def delete_post(request: Request, id: str, db_sess: Session = Depends(get_db)):
     try:
         del_labs = db_sess.query(Labs).get(id)
+        user_id = get_user_id_from_cookie(request)
+        if del_labs:
+            if del_labs.user_id != user_id:
+                raise HTTPException(status_code=400, detail="Not found")
         if del_labs:
             db_sess.delete(del_labs)
             db_sess.commit()
