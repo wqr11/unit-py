@@ -26,6 +26,7 @@ from fastapi import FastAPI, BackgroundTasks
 from email_utils import send_report_email
 from chat.openai import client
 import json
+from starlette.middleware.base import BaseHTTPMiddleware
 
 
 # Загружаем переменные из .env
@@ -292,11 +293,18 @@ async def login(response: Response, user: UserLoginBase, db_sess: Session = Depe
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def add_cors_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 
 @app.post("/labs", dependencies=[Depends(verify_token)])
