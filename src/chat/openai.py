@@ -2,7 +2,7 @@ from os import getenv
 from dotenv import load_dotenv
 
 from openai import OpenAI
-from prompt import prompt
+from .prompt import prompt
 
 _ = load_dotenv()
 
@@ -14,11 +14,12 @@ class ChatService:
     def __init__(self, base_url: str, api_key: str):
         self.client: OpenAI = OpenAI(base_url=base_url, api_key=api_key)
 
+    
     def validate_task(self, text: str):
         res = self.client.responses.create(
             model="gpt-4.1-nano", input=f"{prompt}\n{text}"
         )
-        return res
+        return res.to_dict()
 
 
 client = ChatService(base_url=OPENAI_BASE_URL, api_key=OPENAI_API_KEY)
