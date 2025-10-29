@@ -270,7 +270,9 @@ async def refresh_token(response: Response, request: Request, db_sess: Session =
 async def login(response: Response, user: UserLoginBase, db_sess: Session = Depends(get_db)):
     try:
         db_user = db_sess.query(Users).filter(Users.email == user.email).first()
-        if not db_user:
+        print(type(db_user))
+        print(db_user is None)
+        if db_user is None:
             raise HTTPException(status_code=401, detail="Invalid email or password")
         if not verify_password(user.password, db_user.password):
             raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -286,7 +288,7 @@ async def login(response: Response, user: UserLoginBase, db_sess: Session = Depe
     except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad requests")
     except:
-        HTTPException(status_code=500, detail="Internal Server Error")
+        raise HTTPException(status_code=401, detail="Not found")
 
 
 
