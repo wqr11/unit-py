@@ -7,15 +7,18 @@ from fastapi import FastAPI, Depends, HTTPException, status, Response, Request
 from jose import jwt, JWTError, ExpiredSignatureError
 from dotenv import load_dotenv
 import uvicorn
-import redis.asyncio as aioredis
+import redis.asyncio as aioredis    
 from sqlalchemy.orm import Session
+from models.subject import Subject
 from models.User import Users
 from models.labs import Labs
 from BaseModel.UserRegBase import UserRegBase
+from BaseModel.BaseJoin import BaseJoin
 from BaseModel.LabsBase import LabsBase
 from BaseModel.Lab_test import LabTestBase
 from BaseModel.UpdateBase import UpdateBase
 from BaseModel.UserLoginBase import UserLoginBase
+from BaseModel.BaseSubject import BaseSubject
 from unit import *
 from models.db_session import global_init, create_session
 from passlib.context import CryptContext
@@ -27,7 +30,7 @@ from email_utils import send_report_email
 from chat.openai import client
 import json
 from starlette.middleware.base import BaseHTTPMiddleware
-
+from BaseModel.LabCreate import LabCreate
 
 # Загружаем переменные из .env
 load_dotenv()
@@ -318,6 +321,7 @@ def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_
             data_input=data.data_input,
             data_output=data.data_output,
             comment_for_ai=data.comment_for_ai,
+            subject_id=data.subject_id,
             user_id=user_id,
             name=data.name
         )
@@ -448,6 +452,53 @@ def delete_post(request: Request, id: str, db_sess: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Bad request")
     else:
         return {"detail": "deleted successfully"}
+    
+
+
+@app.post("/join", dependencies=[Depends(verify_token)])
+def join(request: Request, data: BaseJoin, db_sess: Session = Depends(get_db)):
+    try:
+        cur_user = db_sess.query(Users).get(get_user_id_from_cookie(request))
+        subject = db_sess.query(Subject).filter(Subject.id == data.subject_id).first()
+        if not subject:
+            raise HTTPException(status_code=401, detail="Not found")
+        if subject.pass_key != data.pass_key:
+            raise HTTPException(status_code=403, detail="Invalid pass key")
+         # 3. Проверяем, не записан ли пользователь уже
+        if subject in cur_user.enrolled_subjects:
+            raise HTTPException(status_code=400, detail="Already joined")
+
+        # 4. Добавляем студента в предмет
+        cur_user.enrolled_subjects.append(subject)
+
+        # 5. Сохраняем изменения
+        db_sess.commit()
+
+        return {"message": f"You successfully joined '{subject.name}'"}
+    except exc.StatementError:
+        raise HTTPException(status_code=400, detail="Bad request")
+    else:
+        return {"message": f"You successfully joined '{subject.name}'"}
+    
+
+@app.post("/subjects", dependencies=[Depends(verify_token)])
+def create_subject(request: Request, data: BaseSubject, db_sess: Session = Depends(get_db)):
+    try:
+        user_id = get_user_id_from_cookie(request)
+        new_subject = Subject(
+            id=str(uuid4()),
+            name=data.name,
+            pass_key=data.pass_key,
+            author_id=user_id
+        )
+        db_sess.add(new_subject)
+        db_sess.commit()
+        db_sess.refresh(new_subject)
+    except exc.StatementError:
+        raise HTTPException(status_code=400, detail="Bad request")
+    else:
+        return new_subject
+
 
 
 if __name__ == "__main__":
