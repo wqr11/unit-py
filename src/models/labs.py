@@ -15,5 +15,8 @@ class Labs(SqlAlchemyBase):
     # внешний ключ на Users.id
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
 
+    subject_id = Column(String, ForeignKey("subject.id", ondelete="CASCADE"), nullable=False)
+    subject = relationship("Subject", back_populates="labs")
+
     # обратная связь
     user = relationship("Users", back_populates="labs")
