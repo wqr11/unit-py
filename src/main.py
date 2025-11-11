@@ -7,7 +7,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Response, Request
 from jose import jwt, JWTError, ExpiredSignatureError
 from dotenv import load_dotenv
 import uvicorn
-import redis.asyncio as aioredis    
+import redis.asyncio as aioredis
 from sqlalchemy.orm import Session
 from models.subject import Subject
 from models.User import Users
@@ -46,8 +46,8 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
-ACCESS_TOKEN_COOKIE=os.getenv("ACCESS_TOKEN_COOKIE")
-REFRESH_TOKEN_COOKIE=os.getenv("REFRESH_TOKEN_COOKIE")
+ACCESS_TOKEN_COOKIE = str(os.getenv("ACCESS_TOKEN_COOKIE"))
+REFRESH_TOKEN_COOKIE = str(os.getenv("REFRESH_TOKEN_COOKIE"))
 
 redis_host = os.getenv("REDIS_HOST")
 redis_port = int(os.getenv("REDIS_PORT", 6379))
@@ -60,6 +60,7 @@ global_init()
 app = FastAPI()
 redis_client = aioredis.Redis(host=redis_host, port=redis_port, decode_responses=True)
 
+
 def get_db():
     db = create_session()
     try:
@@ -67,7 +68,10 @@ def get_db():
     finally:
         db.close()
 
-def json_to_email_text(result_json, first_name="", last_name="", student_code="", ai_feedback=None):
+
+def json_to_email_text(
+    result_json, first_name="", last_name="", student_code="", ai_feedback=None
+):
     lines = []
 
     # Информация об авторе
@@ -83,36 +87,40 @@ def json_to_email_text(result_json, first_name="", last_name="", student_code=""
 
     # Основная информация
     lines.append(f"✅ Correct: {result_json['correct']}")
-    lines.append(f"Пройдено тестов: {result_json['passed_tests']} из {result_json['total_tests']}")
-    lines.append(f"Процент успешных тестов: {result_json['success_rate']*100:.1f}%\n")
+    lines.append(
+        f"Пройдено тестов: {result_json['passed_tests']} из {result_json['total_tests']}"
+    )
+    lines.append(f"Процент успешных тестов: {result_json['success_rate'] * 100:.1f}%\n")
 
     # Ошибки общего уровня
-    if result_json.get('errors'):
+    if result_json.get("errors"):
         lines.append("Ошибки:")
-        for err in result_json['errors']:
+        for err in result_json["errors"]:
             lines.append(f"  - {err}")
         lines.append("")
 
     # Логи
-    if result_json.get('logs'):
+    if result_json.get("logs"):
         lines.append("Логи:")
-        for log in result_json['logs']:
+        for log in result_json["logs"]:
             lines.append(f"  {log}")
         lines.append("")
 
     # Подробные результаты
-    if result_json.get('detailed_results'):
+    if result_json.get("detailed_results"):
         lines.append("Подробные результаты тестов:")
-        for dr in result_json['detailed_results']:
-            lines.append(f"Тест #{dr['test_number']}: {'✅' if dr['correct'] else '❌'}")
+        for dr in result_json["detailed_results"]:
+            lines.append(
+                f"Тест #{dr['test_number']}: {'✅' if dr['correct'] else '❌'}"
+            )
             lines.append(f"  Входные данные: {dr['input']}")
             lines.append(f"  Ожидаемый вывод: {dr['expected_output']}")
             lines.append(f"  Фактический вывод: {dr['actual_output']}")
-            if dr.get('error'):
+            if dr.get("error"):
                 lines.append(f"  Ошибка: {dr['error']}")
-            if dr.get('diff'):
+            if dr.get("diff"):
                 lines.append(f"  Diff:\n{dr['diff']}")
-            if dr.get('log'):
+            if dr.get("log"):
                 lines.append(f"  Лог:\n{dr['log']}")
             lines.append("")
 
@@ -123,7 +131,7 @@ def json_to_email_text(result_json, first_name="", last_name="", student_code=""
         for e in ai_feedback["errors"]:
             row = e["row"]
             code_line = student_lines[row - 1] if 0 < row <= len(student_lines) else ""
-            
+
             # стрелочки под всю строку (пока нет точного столбца)
             pointer_line = " " * 0 + "∧" * len(code_line) if code_line else ""
 
@@ -132,9 +140,8 @@ def json_to_email_text(result_json, first_name="", last_name="", student_code=""
                 lines.append(pointer_line)
             lines.append(f"{e['error_message']}")
             lines.append("")
-    
-    return "\n".join(lines)
 
+    return "\n".join(lines)
 
 
 def verify_token(request: Request):
@@ -146,6 +153,7 @@ def verify_token(request: Request):
         jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
 
 def get_user_id_from_cookie(request: Request) -> str:
     """
@@ -177,7 +185,9 @@ def get_user_id_from_cookie(request: Request) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -186,7 +196,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     token_id = str(uuid4())
-    expire = datetime.utcnow() + (expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+    expire = datetime.utcnow() + (
+        expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
     to_encode.update({"exp": expire, "type": "refresh", "jti": token_id})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -199,7 +211,7 @@ def save_cookies(response, access, refresh):
         httponly=True,  # защищает от JS-доступа
         secure=False,  # True в проде (HTTPS)
         samesite="lax",  # можно strict/lax/none
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
     response.set_cookie(
         key=REFRESH_TOKEN_COOKIE,
@@ -207,8 +219,9 @@ def save_cookies(response, access, refresh):
         httponly=True,  # защищает от JS-доступа
         secure=False,  # True в проде (HTTPS)
         samesite="lax",  # можно strict/lax/none
-        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24,
     )
+
 
 async def save_in_redis(user_id: str, token: str):
     await redis_client.setex(
@@ -224,9 +237,20 @@ def hashed_password(password):
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
+
 @app.get("/")
 def test():
     return example()
+
+
+@app.get("/me")
+def handleGetMe(res: Response, req: Request, db_sess: Session = Depends(get_db)):
+    try:
+        user_id = get_user_id_from_cookie(req)
+        user = db_sess.query(Users).filter(Users.id == user_id).first()
+        return user
+    except:
+        raise HTTPException(status_code=500, detail="Error on /me request")
 
 
 @app.post("/register")
@@ -235,44 +259,46 @@ def register(user: UserRegBase, db_sess: Session = Depends(get_db)):
         if db_sess.query(Users).filter(Users.email == user.email).first():
             raise HTTPException(status_code=401, detail="Email already register")
         new_user = Users(
-            id=str(uuid4()),
-            email=user.email,
-            password=hashed_password(user.password)
+            id=str(uuid4()), email=user.email, password=hashed_password(user.password)
         )
         db_sess.add(new_user)
         db_sess.commit()
         db_sess.refresh(new_user)
     except exc.StatementError as f:
         print(f)
-        raise HTTPException(status_code=400, detail='Bad request')
+        raise HTTPException(status_code=400, detail="Bad request")
     else:
         return {"id": new_user.id}
 
 
 @app.post("/refresh")
-async def refresh_token(response: Response, request: Request, db_sess: Session = Depends(get_db)):
-        try:
-            refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE)
-            payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
-            user_id = payload.get("sub")
-            stored_token = await redis_client.get(f"refresh:{user_id}")
-            if not stored_token:
-                raise HTTPException(status_code=401, detail="Refresh token revoked or expired")
-            new_redresh_token = create_refresh_token({"sub": user_id})
-            new_access_token = create_access_token({"sub": user_id})
-            save_in_redis(user_id, new_redresh_token)
-            save_cookies(response, new_access_token, new_redresh_token)
-            return {"messege": "ok"}
-        except ExpiredSignatureError:
-            raise HTTPException(status_code=401, detail="Refresh token expired")
-        except JWTError:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
-        
-
+async def refresh_token(
+    response: Response, request: Request, db_sess: Session = Depends(get_db)
+):
+    try:
+        refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE)
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        stored_token = await redis_client.get(f"refresh:{user_id}")
+        if not stored_token:
+            raise HTTPException(
+                status_code=401, detail="Refresh token revoked or expired"
+            )
+        new_redresh_token = create_refresh_token({"sub": user_id})
+        new_access_token = create_access_token({"sub": user_id})
+        save_in_redis(user_id, new_redresh_token)
+        save_cookies(response, new_access_token, new_redresh_token)
+        return {"messege": "ok"}
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 
 @app.post("/login")
-async def login(response: Response, user: UserLoginBase, db_sess: Session = Depends(get_db)):
+async def login(
+    response: Response, user: UserLoginBase, db_sess: Session = Depends(get_db)
+):
     try:
         db_user = db_sess.query(Users).filter(Users.email == user.email).first()
         print(type(db_user))
@@ -287,14 +313,15 @@ async def login(response: Response, user: UserLoginBase, db_sess: Session = Depe
         save_in_redis(db_user.id, refresh_token)
 
         if not (access_token and refresh_token):
-            raise HTTPException(status_code=500, detail="No access or refresh tokens were acquired")
+            raise HTTPException(
+                status_code=500, detail="No access or refresh tokens were acquired"
+            )
 
         return {"access_token": access_token, "refresh_token": refresh_token}
     except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad requests")
     except:
         raise HTTPException(status_code=401, detail="Not found")
-
 
 
 app.add_middleware(
@@ -305,10 +332,11 @@ app.add_middleware(
     allow_headers=["Authorization", "Accept", "Content-Type", "Cookie"],
 )
 
+
 @app.post("/labs", dependencies=[Depends(verify_token)])
 def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_db)):
     try:
-        user_id=get_user_id_from_cookie(requests)
+        user_id = get_user_id_from_cookie(requests)
         new_labs = Labs(
             id=str(uuid4()),
             data_input=data.data_input,
@@ -316,7 +344,7 @@ def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_
             comment_for_ai=data.comment_for_ai,
             subject_id=data.subject_id,
             user_id=user_id,
-            name=data.name
+            name=data.name,
         )
         db_sess.add(new_labs)
         db_sess.commit()
@@ -329,9 +357,7 @@ def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_
 
 @app.post("/labs/{id}/test")
 async def handle_lab_test(
-    student_code: LabTestBase,
-    id: str,
-    db_sess: Session = Depends(get_db)
+    student_code: LabTestBase, id: str, db_sess: Session = Depends(get_db)
 ):
     # получаем лабораторную
     lab = db_sess.query(Labs).filter(Labs.id == id).first()
@@ -355,7 +381,7 @@ async def handle_lab_test(
     student_code: LabTestBase,
     background_tasks: BackgroundTasks,
     id: str,
-    db_sess: Session = Depends(get_db)
+    db_sess: Session = Depends(get_db),
 ):
     try:
         # получаем лабораторную
@@ -373,16 +399,21 @@ async def handle_lab_test(
 
         # получаем email владельца лабораторной
         user_email = (
-            db_sess.query(Users.email)
-            .join(Labs)
-            .filter(Labs.id == id)
-            .scalar()
+            db_sess.query(Users.email).join(Labs).filter(Labs.id == id).scalar()
         )
         if not user_email:
             raise HTTPException(status_code=404, detail="User email not found")
-        comm_ai = client.validate_task(f'Код студента:\n{student_code.student_code}\n\nКомментарии преподавателя:\n{lab.comment_for_ai}')
-        text = json_to_email_text(result, student_code.name, student_code.surname, student_code.student_code, json.loads(comm_ai["output_text"]))
-        print( json.loads(comm_ai["output_text"]))
+        comm_ai = client.validate_task(
+            f"Код студента:\n{student_code.student_code}\n\nКомментарии преподавателя:\n{lab.comment_for_ai}"
+        )
+        text = json_to_email_text(
+            result,
+            student_code.name,
+            student_code.surname,
+            student_code.student_code,
+            json.loads(comm_ai["output_text"]),
+        )
+        print(json.loads(comm_ai["output_text"]))
         background_tasks.add_task(send_report_email, user_email, text)
 
         return result
@@ -393,7 +424,12 @@ async def handle_lab_test(
 
 
 @app.patch("/labs/{id}", dependencies=[Depends(verify_token)])
-def update_labs(request: Request, update_labs: UpdateBase, id: str, db_sess: Session = Depends(get_db)):
+def update_labs(
+    request: Request,
+    update_labs: UpdateBase,
+    id: str,
+    db_sess: Session = Depends(get_db),
+):
     try:
         labs = db_sess.query(Labs).get(id)
         user_id = get_user_id_from_cookie(request)
@@ -445,7 +481,6 @@ def delete_post(request: Request, id: str, db_sess: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Bad request")
     else:
         return {"detail": "deleted successfully"}
-    
 
 
 @app.post("/join", dependencies=[Depends(verify_token)])
@@ -457,7 +492,7 @@ def join(request: Request, data: BaseJoin, db_sess: Session = Depends(get_db)):
             raise HTTPException(status_code=401, detail="Not found")
         if subject.pass_key != data.pass_key:
             raise HTTPException(status_code=403, detail="Invalid pass key")
-         # 3. Проверяем, не записан ли пользователь уже
+        # 3. Проверяем, не записан ли пользователь уже
         if subject in cur_user.enrolled_subjects:
             raise HTTPException(status_code=400, detail="Already joined")
 
@@ -472,17 +507,25 @@ def join(request: Request, data: BaseJoin, db_sess: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Bad request")
     else:
         return {"message": f"You successfully joined '{subject.name}'"}
-    
+
+
+@app.get("/subjects")
+def handle_subjects_list(request: Request, db_sess: Session = Depends(get_db)):
+    try:
+        subjects = db_sess.query(Subject).all()
+        return subjects
+    except:
+        raise HTTPException(status_code=500, detail="Couldn't list /subjects")
+
 
 @app.post("/subjects", dependencies=[Depends(verify_token)])
-def create_subject(request: Request, data: BaseSubject, db_sess: Session = Depends(get_db)):
+def create_subject(
+    request: Request, data: BaseSubject, db_sess: Session = Depends(get_db)
+):
     try:
         user_id = get_user_id_from_cookie(request)
         new_subject = Subject(
-            id=str(uuid4()),
-            name=data.name,
-            pass_key=data.pass_key,
-            author_id=user_id
+            id=str(uuid4()), name=data.name, pass_key=data.pass_key, author_id=user_id
         )
         db_sess.add(new_subject)
         db_sess.commit()
@@ -491,7 +534,6 @@ def create_subject(request: Request, data: BaseSubject, db_sess: Session = Depen
         raise HTTPException(status_code=400, detail="Bad request")
     else:
         return new_subject
-
 
 
 if __name__ == "__main__":
