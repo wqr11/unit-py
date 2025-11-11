@@ -46,6 +46,8 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
+ACCESS_TOKEN_COOKIE=os.getenv("ACCESS_TOKEN_COOKIE")
+REFRESH_TOKEN_COOKIE=os.getenv("REFRESH_TOKEN_COOKIE")
 
 redis_host = os.getenv("REDIS_HOST")
 redis_port = int(os.getenv("REDIS_PORT", 6379))
@@ -136,7 +138,7 @@ def json_to_email_text(result_json, first_name="", last_name="", student_code=""
 
 
 def verify_token(request: Request):
-    token = request.cookies.get("access_token")
+    token = request.cookies.get(ACCESS_TOKEN_COOKIE)
     if not token:
         raise HTTPException(status_code=401, detail="Access token missing")
 
@@ -150,7 +152,7 @@ def get_user_id_from_cookie(request: Request) -> str:
     Извлекает user_id (str) из JWT токена, хранящегося в cookies.
     Подходит для UUID в строковом формате (например, uuid64).
     """
-    token = request.cookies.get("access_token")
+    token = request.cookies.get(ACCESS_TOKEN_COOKIE)
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -192,7 +194,7 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 def save_cookies(response, access, refresh):
     response.set_cookie(
-        key="access_token",
+        key=ACCESS_TOKEN_COOKIE,
         value=access,
         httponly=True,  # защищает от JS-доступа
         secure=False,  # True в проде (HTTPS)
@@ -200,7 +202,7 @@ def save_cookies(response, access, refresh):
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
     response.set_cookie(
-        key="refresh_token",
+        key=REFRESH_TOKEN_COOKIE,
         value=refresh,
         httponly=True,  # защищает от JS-доступа
         secure=False,  # True в проде (HTTPS)
@@ -250,7 +252,7 @@ def register(user: UserRegBase, db_sess: Session = Depends(get_db)):
 @app.post("/refresh")
 async def refresh_token(response: Response, request: Request, db_sess: Session = Depends(get_db)):
         try:
-            refresh_token = request.cookies.get("refresh_token")
+            refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE)
             payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id = payload.get("sub")
             stored_token = await redis_client.get(f"refresh:{user_id}")
@@ -297,20 +299,11 @@ async def login(response: Response, user: UserLoginBase, db_sess: Session = Depe
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Accept", "Content-Type", "Cookie"],
 )
-
-@app.middleware("http")
-async def add_cors_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
-
 
 @app.post("/labs", dependencies=[Depends(verify_token)])
 def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_db)):

@@ -15,7 +15,7 @@ services:
       - unit_py_net
     develop:
       watch:
-        - action: sync
+        - action: rebuild
           path: ./app
           target: ./src
           ignore:
