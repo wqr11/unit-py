@@ -450,6 +450,11 @@ def update_labs(
         return labs
 
 
+@app.get("/subjects/labs/{subject_id}")
+def handle_list_labs_by_subject_id(subject_id: str, db_sess: Session = Depends(get_db)):
+    return db_sess.query(Labs).where(Labs.subject_id == subject_id).all()
+
+
 @app.get("/labs")
 def get_all_labs(db_sess: Session = Depends(get_db)):
     return db_sess.query(Labs).all()
