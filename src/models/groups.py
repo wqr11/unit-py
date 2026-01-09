@@ -1,5 +1,5 @@
 from sqlalchemy import Table, Column, String, ForeignKey, PrimaryKeyConstraint
-from models.db_session import SqlAlchemyBase
+from .db_session import SqlAlchemyBase
 
 Groups = Table(
     "groups",

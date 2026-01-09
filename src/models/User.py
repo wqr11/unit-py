@@ -1,8 +1,8 @@
 # models/users.py
 from sqlalchemy import String, Column, Boolean
 from sqlalchemy.orm import relationship
-from models.db_session import SqlAlchemyBase
-from models.groups import Groups
+from .db_session import SqlAlchemyBase
+from .groups import Groups
 
 class Users(SqlAlchemyBase):
     __tablename__ = 'users'

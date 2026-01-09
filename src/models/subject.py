@@ -1,9 +1,9 @@
 from sqlalchemy import String, Column, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
-from models.db_session import SqlAlchemyBase
+from .db_session import SqlAlchemyBase
 from sqlalchemy.sql import func
-from models.groups import Groups
+from .groups import Groups
 
 class Subject(SqlAlchemyBase):
     __tablename__ = "subject"

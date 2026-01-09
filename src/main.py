@@ -29,8 +29,6 @@ from fastapi import FastAPI, BackgroundTasks
 from email_utils import send_report_email
 from chat.openai import client
 import json
-from starlette.middleware.base import BaseHTTPMiddleware
-from BaseModel.LabCreate import LabCreate
 
 # Загружаем переменные из .env
 load_dotenv()
@@ -208,7 +206,7 @@ def save_cookies(response, access, refresh):
     response.set_cookie(
         key=ACCESS_TOKEN_COOKIE,
         value=access,
-        httponly=True,  # защищает от JS-доступа
+        httponly=False,  # защищает от JS-доступа
         secure=False,  # True в проде (HTTPS)
         samesite="lax",  # можно strict/lax/none
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
@@ -216,7 +214,7 @@ def save_cookies(response, access, refresh):
     response.set_cookie(
         key=REFRESH_TOKEN_COOKIE,
         value=refresh,
-        httponly=True,  # защищает от JS-доступа
+        httponly=False,  # защищает от JS-доступа
         secure=False,  # True в проде (HTTPS)
         samesite="lax",  # можно strict/lax/none
         max_age=REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24,
@@ -345,6 +343,7 @@ def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_
             subject_id=data.subject_id,
             user_id=user_id,
             name=data.name,
+            task=data.task
         )
         db_sess.add(new_labs)
         db_sess.commit()
@@ -539,6 +538,14 @@ def create_subject(
         raise HTTPException(status_code=400, detail="Bad request")
     else:
         return new_subject
+
+
+# @app.middleware("http")
+# async def check_auth(req: Request, call_next):
+    
+    
+#     res = await call_next(req)
+#     return res
 
 
 if __name__ == "__main__":
