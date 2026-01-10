@@ -257,7 +257,7 @@ def register(user: UserRegBase, db_sess: Session = Depends(get_db)):
         if db_sess.query(Users).filter(Users.email == user.email).first():
             raise HTTPException(status_code=401, detail="Email already register")
         new_user = Users(
-            id=str(uuid4()), email=user.email, password=hashed_password(user.password)
+            id=str(uuid4()), email=user.email, password=hashed_password(user.password), is_teacher=user.is_teacher
         )
         db_sess.add(new_user)
         db_sess.commit()
@@ -284,7 +284,7 @@ async def refresh_token(
             )
         new_redresh_token = create_refresh_token({"sub": user_id})
         new_access_token = create_access_token({"sub": user_id})
-        save_in_redis(user_id, new_redresh_token)
+        await save_in_redis(user_id, new_redresh_token)
         save_cookies(response, new_access_token, new_redresh_token)
         return {"messege": "ok"}
     except ExpiredSignatureError:
@@ -303,12 +303,12 @@ async def login(
         print(db_user is None)
         if db_user is None:
             raise HTTPException(status_code=401, detail="Invalid email or password")
-        if not verify_password(user.password, db_user.password):
+        if not verify_password(user.password, str(db_user.password)):
             raise HTTPException(status_code=401, detail="Invalid email or password")
         access_token = create_access_token(data={"sub": str(db_user.id)})
         refresh_token = create_refresh_token(data={"sub": str(db_user.id)})
         save_cookies(response, access_token, refresh_token)
-        save_in_redis(db_user.id, refresh_token)
+        await save_in_redis(str(db_user.id), refresh_token)
 
         if not (access_token and refresh_token):
             raise HTTPException(
