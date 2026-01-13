@@ -16,8 +16,8 @@ services:
     develop:
       watch:
         - action: rebuild
-          path: ./app
-          target: ./src
+          path: ./src
+          target: ./app
           ignore:
             - __pycache__/
 

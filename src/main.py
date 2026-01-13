@@ -402,18 +402,30 @@ async def handle_lab_test(
         )
         if not user_email:
             raise HTTPException(status_code=404, detail="User email not found")
-        comm_ai = client.validate_task(
-            f"Код студента:\n{student_code.student_code}\n\nКомментарии преподавателя:\n{lab.comment_for_ai}"
-        )
+        comm_ai = None
+        try:
+            comm_ai = client.validate_task(
+                f"Код студента:\n{student_code.student_code}\n\nКомментарии преподавателя:\n{lab.comment_for_ai}"
+            )
+        except:
+            print("[ОШИБКА] Не удалось подключиться к ИИ модели!")
+
+        ai_result = json.loads(comm_ai["output_text"]) if comm_ai != None else ""
+        
         text = json_to_email_text(
             result,
             student_code.name,
             student_code.surname,
             student_code.student_code,
-            json.loads(comm_ai["output_text"]),
+            ai_result,
         )
-        print(json.loads(comm_ai["output_text"]))
-        background_tasks.add_task(send_report_email, user_email, text)
+        try:
+            await send_report_email(user_email, text)
+            result["email_delivered"] = True
+        except:
+            result["email_delivered"] = False
+        # @TODO: Fix -- this is temporary
+        # background_tasks.add_task(send_report_email, user_email, text)
 
         return result
 
@@ -538,15 +550,6 @@ def create_subject(
         raise HTTPException(status_code=400, detail="Bad request")
     else:
         return new_subject
-
-
-# @app.middleware("http")
-# async def check_auth(req: Request, call_next):
-    
-    
-#     res = await call_next(req)
-#     return res
-
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
