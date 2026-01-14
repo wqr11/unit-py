@@ -164,6 +164,9 @@ async def refresh_token(
     # 2) move logic to auth_service.refresh 
     try:
         refresh_token = request.cookies.get(ENV.REFRESH_TOKEN_COOKIE)
+        if not refresh_token:
+            raise HTTPException(status_code=401, detail="No refresh token")
+
         payload = jwt.decode(refresh_token, ENV.SECRET_KEY, algorithms=[ENV.ALGORITHM])
         user_id = payload.get("sub")
         stored_token = await redis_client.get(f"refresh:{user_id}")
@@ -171,10 +174,13 @@ async def refresh_token(
             raise HTTPException(
                 status_code=401, detail="Refresh token revoked or expired"
             )
+
         new_refresh_token = auth_service.create_refresh_token({"sub": user_id})
         new_access_token = auth_service.create_access_token({"sub": user_id})
-        await save_in_redis(user_id, new_refresh_token)
-        # save_cookies(response, new_access_token, new_refresh_token)
+        
+        await auth_service.save_in_redis(str(user_id or ""), new_refresh_token)
+        auth_service.save_cookies(response, new_access_token, new_refresh_token)
+        
         return {"access_token": new_access_token, "refresh_token": new_refresh_token}
     except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
@@ -186,7 +192,7 @@ async def refresh_token(
 async def login(
     response: Response, user: UserLoginBase, db_sess: Session = Depends(get_db)
 ):
-    return auth_service.login(user, db_sess)
+    return await auth_service.login(response, user, db_sess)
 
 
 app.add_middleware(

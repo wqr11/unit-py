@@ -12,6 +12,24 @@ from config.env import ENV
 from config.redis import redis_client
 
 class AuthService:
+    def save_cookies(self, response, access, refresh):
+        response.set_cookie(
+            key=ACCESS_TOKEN_COOKIE,
+            value=access,
+            httponly=True,  # защищает от JS-доступа
+            secure=True,  # True в проде (HTTPS)
+            samesite="None",  # можно strict/lax/none
+            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        )
+        response.set_cookie(
+            key=REFRESH_TOKEN_COOKIE,
+            value=refresh,
+            httponly=True,  # защищает от JS-доступа
+            secure=True,  # True в проде (HTTPS)
+            samesite="None",  # можно strict/lax/none
+            max_age=REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24,
+        )
+
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
         to_encode = data.copy()
         expire = datetime.utcnow() + (
@@ -79,7 +97,7 @@ class AuthService:
         )
 
     async def login(
-        self, user: UserLoginBase, db_sess: Session
+        self, response: Response, user: UserLoginBase, db_sess: Session
     ):
         try:
             db_user = db_sess.query(Users).filter(Users.email == user.email).first()
@@ -92,7 +110,7 @@ class AuthService:
             access_token = self.create_access_token(data={"sub": str(db_user.id)})
             refresh_token = self.create_refresh_token(data={"sub": str(db_user.id)})
             
-            # save_cookies(response, access_token, refresh_token)
+            self.save_cookies(response, access_token, refresh_token)
             await self.save_in_redis(str(db_user.id), refresh_token)
 
             if not (access_token and refresh_token):
