@@ -208,16 +208,16 @@ def save_cookies(response, access, refresh):
         key=ACCESS_TOKEN_COOKIE,
         value=access,
         httponly=False,  # защищает от JS-доступа
-        secure=False,  # True в проде (HTTPS)
-        samesite="lax",  # можно strict/lax/none
+        secure=True,  # True в проде (HTTPS)
+        samesite="None",  # можно strict/lax/none
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
     response.set_cookie(
         key=REFRESH_TOKEN_COOKIE,
         value=refresh,
         httponly=False,  # защищает от JS-доступа
-        secure=False,  # True в проде (HTTPS)
-        samesite="lax",  # можно strict/lax/none
+        secure=True,  # True в проде (HTTPS)
+        samesite="None",  # можно strict/lax/none
         max_age=REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24,
     )
 
