@@ -195,10 +195,16 @@ async def login(
 ):
     return await auth_service.login(response, user, db_sess)
 
-@app.post("/logout")
-async def logout(response: Response):
+@app.get("/logout")
+async def logout():
+    response = RedirectResponse(
+        url=ENV.ALLOW_ORIGINS_HEADER,
+        status_code=308
+    )
+    
     auth_service.logout(response)
-    return RedirectResponse(url=ENV.ALLOW_ORIGINS_HEADER)
+    
+    return response
 
 
 app.add_middleware(

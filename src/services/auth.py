@@ -12,9 +12,19 @@ from config.env import ENV
 from config.redis import redis_client
 
 class AuthService:
-    def logout(self, response):
-        response.delete_cookie(ENV.ACCESS_TOKEN_COOKIE)
-        response.delete_cookie(ENV.REFRESH_TOKEN_COOKIE)
+    def logout(self, response: Response):
+        response.delete_cookie(
+            key=ENV.ACCESS_TOKEN_COOKIE,
+            httponly=True,  # защищает от JS-доступа
+            secure=True,  # True в проде (HTTPS)
+            samesite="none",  # можно strict/lax/none
+        )
+        response.delete_cookie(
+            key=ENV.REFRESH_TOKEN_COOKIE,
+            httponly=True,  # защищает от JS-доступа
+            secure=True,  # True в проде (HTTPS)
+            samesite="none",  # можно strict/lax/none
+        )
         return "OK"
 
     def save_cookies(self, response, access, refresh):
@@ -23,7 +33,7 @@ class AuthService:
             value=access,
             httponly=True,  # защищает от JS-доступа
             secure=True,  # True в проде (HTTPS)
-            samesite="None",  # можно strict/lax/none
+            samesite="none",  # можно strict/lax/none
             max_age=ENV.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
         response.set_cookie(
@@ -31,7 +41,7 @@ class AuthService:
             value=refresh,
             httponly=True,  # защищает от JS-доступа
             secure=True,  # True в проде (HTTPS)
-            samesite="None",  # можно strict/lax/none
+            samesite="none",  # можно strict/lax/none
             max_age=ENV.REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24,
         )
 
