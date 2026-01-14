@@ -210,6 +210,7 @@ def save_cookies(response, access, refresh):
         httponly=False,  # защищает от JS-доступа
         secure=True,  # True в проде (HTTPS)
         samesite="None",  # можно strict/lax/none
+        domain=ALLOW_ORIGINS_HEADER,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
     response.set_cookie(
@@ -218,6 +219,7 @@ def save_cookies(response, access, refresh):
         httponly=False,  # защищает от JS-доступа
         secure=True,  # True в проде (HTTPS)
         samesite="None",  # можно strict/lax/none
+        domain=ALLOW_ORIGINS_HEADER,
         max_age=REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24,
     )
 
@@ -300,8 +302,6 @@ async def login(
 ):
     try:
         db_user = db_sess.query(Users).filter(Users.email == user.email).first()
-        print(type(db_user))
-        print(db_user is None)
         if db_user is None:
             raise HTTPException(status_code=401, detail="Invalid email or password")
         if not verify_password(user.password, str(db_user.password)):
@@ -319,8 +319,9 @@ async def login(
         return {"access_token": access_token, "refresh_token": refresh_token}
     except exc.StatementError:
         raise HTTPException(status_code=400, detail="Bad requests")
-    except:
-        raise HTTPException(status_code=401, detail="Not found")
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Unhandled Server Error")
 
 
 app.add_middleware(
