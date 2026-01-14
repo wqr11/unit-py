@@ -46,6 +46,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
 ACCESS_TOKEN_COOKIE = str(os.getenv("ACCESS_TOKEN_COOKIE"))
 REFRESH_TOKEN_COOKIE = str(os.getenv("REFRESH_TOKEN_COOKIE"))
+ALLOW_ORIGINS_HEADER = str(os.getenv("ALLOW_ORIGINS_HEADER"))
 
 redis_host = os.getenv("REDIS_HOST")
 redis_port = int(os.getenv("REDIS_PORT", 6379))
@@ -324,7 +325,7 @@ async def login(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[ALLOW_ORIGINS_HEADER],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["Authorization", "Accept", "Content-Type", "Cookie"],
