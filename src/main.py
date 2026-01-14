@@ -198,7 +198,7 @@ app.add_middleware(
 )
 
 
-@app.post("/labs", dependencies=[Depends(verify_token)])
+@app.post("/labs", dependencies=[Depends(auth_service.verify_token)])
 def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_db)):
     try:
         user_id = get_user_id_from_cookie(requests)
@@ -301,7 +301,7 @@ async def handle_lab_test(
         raise HTTPException(status_code=400, detail="Bad request")
 
 
-@app.patch("/labs/{id}", dependencies=[Depends(verify_token)])
+@app.patch("/labs/{id}", dependencies=[Depends(auth_service.verify_token)])
 def update_labs(
     request: Request,
     update_labs: UpdateBase,
@@ -401,7 +401,7 @@ def handle_subjects_list(request: Request, db_sess: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Couldn't list /subjects")
 
 
-@app.post("/subjects", dependencies=[Depends(verify_token)])
+@app.post("/subjects", dependencies=[Depends(auth_service.verify_token)])
 def create_subject(
     request: Request, data: BaseSubject, db_sess: Session = Depends(get_db)
 ):
