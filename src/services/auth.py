@@ -14,20 +14,20 @@ from config.redis import redis_client
 class AuthService:
     def save_cookies(self, response, access, refresh):
         response.set_cookie(
-            key=ACCESS_TOKEN_COOKIE,
+            key=ENV.ACCESS_TOKEN_COOKIE,
             value=access,
             httponly=True,  # защищает от JS-доступа
             secure=True,  # True в проде (HTTPS)
             samesite="None",  # можно strict/lax/none
-            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            max_age=ENV.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
         response.set_cookie(
-            key=REFRESH_TOKEN_COOKIE,
+            key=ENV.REFRESH_TOKEN_COOKIE,
             value=refresh,
             httponly=True,  # защищает от JS-доступа
             secure=True,  # True в проде (HTTPS)
             samesite="None",  # можно strict/lax/none
-            max_age=REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24,
+            max_age=ENV.REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24,
         )
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):

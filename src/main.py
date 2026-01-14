@@ -207,7 +207,7 @@ app.add_middleware(
 @app.post("/labs", dependencies=[Depends(auth_service.verify_token)])
 def load_data(requests: Request, data: LabsBase, db_sess: Session = Depends(get_db)):
     try:
-        user_id = get_user_id_from_cookie(requests)
+        user_id = auth_service.get_user_id_from_cookie(requests)
         new_labs = Labs(
             id=str(uuid4()),
             data_input=data.data_input,
@@ -249,7 +249,7 @@ async def handle_lab_test(
 
 
 @app.post("/labs/{id}/test-send")
-async def handle_lab_test(
+async def handle_lab_test_send(
     student_code: LabTestBase,
     background_tasks: BackgroundTasks,
     id: str,
@@ -357,7 +357,7 @@ def read_db(id: str, db_sess: Session = Depends(get_db)):
 def delete_post(request: Request, id: str, db_sess: Session = Depends(get_db)):
     try:
         del_labs = db_sess.query(Labs).get(id)
-        user_id = get_user_id_from_cookie(request)
+        user_id = auth_service.get_user_id_from_cookie(request)
         if del_labs:
             if del_labs.user_id != user_id:
                 raise HTTPException(status_code=400, detail="Not found")
@@ -375,7 +375,7 @@ def delete_post(request: Request, id: str, db_sess: Session = Depends(get_db)):
 @app.post("/join", dependencies=[Depends(auth_service.verify_token)])
 def join(request: Request, data: BaseJoin, db_sess: Session = Depends(get_db)):
     try:
-        cur_user = db_sess.query(Users).get(get_user_id_from_cookie(request))
+        cur_user = db_sess.query(Users).get(auth_service.get_user_id_from_cookie(request))
         subject = db_sess.query(Subject).filter(Subject.id == data.subject_id).first()
         if not subject:
             raise HTTPException(status_code=401, detail="Not found")
@@ -412,7 +412,7 @@ def create_subject(
     request: Request, data: BaseSubject, db_sess: Session = Depends(get_db)
 ):
     try:
-        user_id = get_user_id_from_cookie(request)
+        user_id = auth_service.get_user_id_from_cookie(request)
         new_subject = Subject(
             id=str(uuid4()), name=data.name, pass_key=data.pass_key, author_id=user_id
         )
