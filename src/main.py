@@ -194,6 +194,10 @@ async def login(
 ):
     return await auth_service.login(response, user, db_sess)
 
+@app.post("/logout")
+async def logout(response: Response):
+    return auth_service.logout(response)
+
 
 app.add_middleware(
     CORSMiddleware,

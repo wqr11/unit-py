@@ -12,6 +12,11 @@ from config.env import ENV
 from config.redis import redis_client
 
 class AuthService:
+    def logout(self, response):
+        response.delete_cookie(ENV.ACCESS_TOKEN_COOKIE)
+        response.delete_cookie(ENV.REFRESH_TOKEN_COOKIE)
+        return "OK"
+
     def save_cookies(self, response, access, refresh):
         response.set_cookie(
             key=ENV.ACCESS_TOKEN_COOKIE,
