@@ -1,13 +1,9 @@
-from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
-import os
-from sqlalchemy import exc
 from fastapi import FastAPI, Depends, HTTPException, status, Response, Request
 from jose import jwt, JWTError, ExpiredSignatureError
-from dotenv import load_dotenv
 import uvicorn
-import redis.asyncio as aioredis
+from sqlalchemy import exc
 from sqlalchemy.orm import Session
 from models.subject import Subject
 from models.User import Users
@@ -21,44 +17,21 @@ from BaseModel.UserLoginBase import UserLoginBase
 from BaseModel.BaseSubject import BaseSubject
 from unit import *
 from models.db_session import global_init, create_session
-from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
 from argon2 import PasswordHasher
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, BackgroundTasks
 from email_utils import send_report_email
 from chat.openai import client
+from services.auth import auth_service
+from config.env import ENV
+from config.redis import redis_client
 import json
 
-# Загружаем переменные из .env
-load_dotenv()
-
-
-# Получаем значения
-postgres_user = os.getenv("POSTGRES_USER")
-postgres_password = os.getenv("POSTGRES_PASSWORD")
-postgres_db = os.getenv("POSTGRES_DB")
-postgres_url = os.getenv("POSTGRES_URL")
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
-ACCESS_TOKEN_COOKIE = str(os.getenv("ACCESS_TOKEN_COOKIE"))
-REFRESH_TOKEN_COOKIE = str(os.getenv("REFRESH_TOKEN_COOKIE"))
-ALLOW_ORIGINS_HEADER = str(os.getenv("ALLOW_ORIGINS_HEADER"))
-
-redis_host = os.getenv("REDIS_HOST")
-redis_port = int(os.getenv("REDIS_PORT", 6379))
-
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 global_init()
 app = FastAPI()
-redis_client = aioredis.Redis(host=redis_host, port=redis_port, decode_responses=True)
-
 
 def get_db():
     db = create_session()
@@ -143,100 +116,9 @@ def json_to_email_text(
     return "\n".join(lines)
 
 
-def verify_token(request: Request):
-    token = request.cookies.get(ACCESS_TOKEN_COOKIE)
-    if not token:
-        raise HTTPException(status_code=401, detail="Access token missing")
-
-    try:
-        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-
-def get_user_id_from_cookie(request: Request) -> str:
-    """
-    Извлекает user_id (str) из JWT токена, хранящегося в cookies.
-    Подходит для UUID в строковом формате (например, uuid64).
-    """
-    token = request.cookies.get(ACCESS_TOKEN_COOKIE)
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing token in cookies",
-        )
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload: user_id missing",
-            )
-        return str(user_id)
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
-
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (
-        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    to_encode.update({"exp": expire, "type": "access"})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    token_id = str(uuid4())
-    expire = datetime.utcnow() + (
-        expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    )
-    to_encode.update({"exp": expire, "type": "refresh", "jti": token_id})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-def save_cookies(response, access, refresh):
-    response.set_cookie(
-        key=ACCESS_TOKEN_COOKIE,
-        value=access,
-        httponly=False,  # защищает от JS-доступа
-        secure=True,  # True в проде (HTTPS)
-        samesite="None",  # можно strict/lax/none
-        domain=ALLOW_ORIGINS_HEADER,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
-    response.set_cookie(
-        key=REFRESH_TOKEN_COOKIE,
-        value=refresh,
-        httponly=False,  # защищает от JS-доступа
-        secure=True,  # True в проде (HTTPS)
-        samesite="None",  # можно strict/lax/none
-        domain=ALLOW_ORIGINS_HEADER,
-        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 3600 * 24,
-    )
-
-
-async def save_in_redis(user_id: str, token: str):
-    await redis_client.setex(
-        f"refresh:{user_id}", REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600, token
-    )
-
-
 def hashed_password(password):
     ph = PasswordHasher()
     return ph.hash(password)
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
 
 
 @app.get("/")
@@ -247,7 +129,7 @@ def test():
 @app.get("/me")
 def handleGetMe(res: Response, req: Request, db_sess: Session = Depends(get_db)):
     try:
-        user_id = get_user_id_from_cookie(req)
+        user_id = auth_service.get_user_id_from_cookie(req)
         user = db_sess.query(Users).filter(Users.id == user_id).first()
         return user
     except:
@@ -269,27 +151,31 @@ def register(user: UserRegBase, db_sess: Session = Depends(get_db)):
         print(f)
         raise HTTPException(status_code=400, detail="Bad request")
     else:
-        return {"id": new_user.id}
+        return new_user
 
 
 @app.post("/refresh")
 async def refresh_token(
     response: Response, request: Request, db_sess: Session = Depends(get_db)
 ):
+    # @TODO: Change part of this logic to 
+    # 1) use auth_service.login
+    # OR
+    # 2) move logic to auth_service.refresh 
     try:
-        refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE)
-        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        refresh_token = request.cookies.get(ENV.REFRESH_TOKEN_COOKIE)
+        payload = jwt.decode(refresh_token, ENV.SECRET_KEY, algorithms=[ENV.ALGORITHM])
         user_id = payload.get("sub")
         stored_token = await redis_client.get(f"refresh:{user_id}")
         if not stored_token:
             raise HTTPException(
                 status_code=401, detail="Refresh token revoked or expired"
             )
-        new_redresh_token = create_refresh_token({"sub": user_id})
-        new_access_token = create_access_token({"sub": user_id})
-        await save_in_redis(user_id, new_redresh_token)
-        save_cookies(response, new_access_token, new_redresh_token)
-        return {"messege": "ok"}
+        new_refresh_token = auth_service.create_refresh_token({"sub": user_id})
+        new_access_token = auth_service.create_access_token({"sub": user_id})
+        await save_in_redis(user_id, new_refresh_token)
+        # save_cookies(response, new_access_token, new_refresh_token)
+        return {"access_token": new_access_token, "refresh_token": new_refresh_token}
     except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
     except JWTError:
@@ -300,33 +186,12 @@ async def refresh_token(
 async def login(
     response: Response, user: UserLoginBase, db_sess: Session = Depends(get_db)
 ):
-    try:
-        db_user = db_sess.query(Users).filter(Users.email == user.email).first()
-        if db_user is None:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-        if not verify_password(user.password, str(db_user.password)):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-        access_token = create_access_token(data={"sub": str(db_user.id)})
-        refresh_token = create_refresh_token(data={"sub": str(db_user.id)})
-        save_cookies(response, access_token, refresh_token)
-        await save_in_redis(str(db_user.id), refresh_token)
-
-        if not (access_token and refresh_token):
-            raise HTTPException(
-                status_code=500, detail="No access or refresh tokens were acquired"
-            )
-
-        return {"access_token": access_token, "refresh_token": refresh_token}
-    except exc.StatementError:
-        raise HTTPException(status_code=400, detail="Bad requests")
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail="Unhandled Server Error")
+    return auth_service.login(user, db_sess)
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[ALLOW_ORIGINS_HEADER],
+    allow_origins=[ENV.ALLOW_ORIGINS_HEADER],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["Authorization", "Accept", "Content-Type", "Cookie"],
@@ -445,7 +310,7 @@ def update_labs(
 ):
     try:
         labs = db_sess.query(Labs).get(id)
-        user_id = get_user_id_from_cookie(request)
+        user_id = auth_service.get_user_id_from_cookie(request)
         if labs:
             if labs.user_id != user_id:
                 raise HTTPException(status_code=400, detail="Not found")
@@ -482,7 +347,7 @@ def read_db(id: str, db_sess: Session = Depends(get_db)):
         return lab
 
 
-@app.delete("/labs/{id}", dependencies=[Depends(verify_token)])
+@app.delete("/labs/{id}", dependencies=[Depends(auth_service.verify_token)])
 def delete_post(request: Request, id: str, db_sess: Session = Depends(get_db)):
     try:
         del_labs = db_sess.query(Labs).get(id)
@@ -501,7 +366,7 @@ def delete_post(request: Request, id: str, db_sess: Session = Depends(get_db)):
         return {"detail": "deleted successfully"}
 
 
-@app.post("/join", dependencies=[Depends(verify_token)])
+@app.post("/join", dependencies=[Depends(auth_service.verify_token)])
 def join(request: Request, data: BaseJoin, db_sess: Session = Depends(get_db)):
     try:
         cur_user = db_sess.query(Users).get(get_user_id_from_cookie(request))
