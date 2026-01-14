@@ -1,6 +1,7 @@
 from typing import Optional
 from uuid import uuid4
 from fastapi import FastAPI, Depends, HTTPException, status, Response, Request
+from fastapi.responses import RedirectResponse
 from jose import jwt, JWTError, ExpiredSignatureError
 import uvicorn
 from sqlalchemy import exc
@@ -196,7 +197,8 @@ async def login(
 
 @app.post("/logout")
 async def logout(response: Response):
-    return auth_service.logout(response)
+    auth_service.logout(response)
+    return RedirectResponse(url=ENV.ALLOW_ORIGINS_HEADER)
 
 
 app.add_middleware(
